@@ -91,17 +91,17 @@ class ModelTrainer:
         y = data[:, -1].astype(np.float32)
         dates = data[:, 0]
 
-        self.train_X = X[:self.train_len]
-        self.train_y = y[:self.train_len]
-        self.train_dates = dates[:self.train_len]
+        self.train_X = X[: self.train_len]
+        self.train_y = y[: self.train_len]
+        self.train_dates = dates[: self.train_len]
 
-        self.val_X = X[self.train_len:self.val_len]
-        self.val_y = y[self.train_len:self.val_len]
-        self.val_dates = dates[self.train_len:self.val_len]
+        self.val_X = X[self.train_len : self.val_len]
+        self.val_y = y[self.train_len : self.val_len]
+        self.val_dates = dates[self.train_len : self.val_len]
 
-        self.test_X = X[self.val_len:]
-        self.test_y = y[self.val_len:]
-        self.test_dates = dates[self.val_len:]
+        self.test_X = X[self.val_len :]
+        self.test_y = y[self.val_len :]
+        self.test_dates = dates[self.val_len :]
 
     def _initialize_model(self):
         model = Sequential(
@@ -133,9 +133,9 @@ class ModelTrainer:
         )
 
     def save(self, path: Optional[Union[str, os.PathLike]] = None):
-        path = pathlib.Path(path) if path is not None else self.model_path
+        path = pathlib.Path(path).resolve() if path is not None else self.model_path
         path.mkdir(parents=True, exist_ok=True)
 
-        self.model.save(self.model_path / "best_model.keras")
-        with open(self.model_path / "best_scaler.pkl", "wb") as f:
+        self.model.save(path / "best_model.keras")
+        with open(path / "best_scaler.pkl", "wb") as f:
             pickle.dump(self.scaler, f)
