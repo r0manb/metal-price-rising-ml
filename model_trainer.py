@@ -1,3 +1,4 @@
+import json
 import os
 import pathlib
 from typing import Optional, Union
@@ -124,7 +125,16 @@ class ModelTrainer:
         model.compile(optimizer="adam", loss="mse", metrics=["mean_absolute_error"])
         self.model = model
 
-    def train(self):
+    def _save_models(self, path: pathlib.Path) -> None:
+        self.model.save(path / "best_model.keras")
+        with open(path / "best_scaler.pkl", "wb") as f:
+            pickle.dump(self.scaler, f)
+
+    def _save_config(self, path: pathlib.Path) -> None:
+        with open(path / "config.json", "w", encoding="utf-8") as f:
+            json.dump({"window_size": self.window_size}, f)
+
+    def train(self) -> None:
         self.model.fit(
             self.train_X,
             self.train_y,
@@ -132,10 +142,9 @@ class ModelTrainer:
             epochs=self.epochs,
         )
 
-    def save(self, path: Optional[Union[str, os.PathLike]] = None):
+    def save(self, path: Optional[Union[str, os.PathLike]] = None) -> None:
         path = pathlib.Path(path).resolve() if path is not None else self.model_path
         path.mkdir(parents=True, exist_ok=True)
 
-        self.model.save(path / "best_model.keras")
-        with open(path / "best_scaler.pkl", "wb") as f:
-            pickle.dump(self.scaler, f)
+        self._save_config(path)
+        self._save_models(path)
