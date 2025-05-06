@@ -11,7 +11,7 @@ from utils.path_utils import get_absolute_path
 
 
 class Predictor:
-    def __init__(self, path: Union[str, os.PathLike] = "models") -> None:
+    def __init__(self, path: Union[str, os.PathLike] = "") -> None:
         self.path = get_absolute_path(path)
 
         self._load_config()

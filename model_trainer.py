@@ -21,7 +21,7 @@ class ModelTrainer:
         train_percent: float = 0.8,
         val_percent: float = 0.1,
         window_size: int = 7,
-        model_path: Union[str, os.PathLike] = "/",
+        model_path: Union[str, os.PathLike] = "models",
     ):
         self.data_parser = data_parser
         self._scaler = MinMaxScaler((0, 1))
