@@ -1,6 +1,5 @@
 import json
 import os
-import pathlib
 from typing import Union
 
 import numpy as np
@@ -8,10 +7,12 @@ from numpy.typing import ArrayLike
 import pickle
 import tensorflow as tf
 
+from utils.path_utils import get_absolute_path
+
 
 class Predictor:
-    def __init__(self, path: Union[str, os.PathLike] = "/") -> None:
-        self.path = pathlib.Path(path).resolve()
+    def __init__(self, path: Union[str, os.PathLike] = "models") -> None:
+        self.path = get_absolute_path(path)
 
         self._load_config()
         self._load_models()

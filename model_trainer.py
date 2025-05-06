@@ -10,6 +10,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 
 from parsers.data_parser import DataParser
+from utils.path_utils import get_absolute_path
 
 
 class ModelTrainer:
@@ -29,7 +30,7 @@ class ModelTrainer:
         self.train_percent = train_percent
         self.val_percent = val_percent
         self.window_size = window_size
-        self.model_path = pathlib.Path(model_path)
+        self.model_path = get_absolute_path(model_path)
 
         self.train_dates = None
         self.train_X = None
@@ -127,7 +128,7 @@ class ModelTrainer:
         )
 
     def save(self, path: Optional[Union[str, os.PathLike]] = None) -> None:
-        path = pathlib.Path(path).resolve() if path is not None else self.model_path
+        path = get_absolute_path(path) if path is not None else self.model_path
         path.mkdir(parents=True, exist_ok=True)
 
         self._save_config(path)
