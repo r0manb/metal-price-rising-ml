@@ -1,11 +1,16 @@
 import json
 import os
 import pathlib
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 import numpy as np
 import pickle
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    mean_absolute_percentage_error,
+)
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 
@@ -22,7 +27,7 @@ class ModelTrainer:
         val_percent: float = 0.1,
         window_size: int = 7,
         model_path: Union[str, os.PathLike] = "models",
-    ):
+    ) -> None:
         self.data_parser = data_parser
         self._scaler = MinMaxScaler((0, 1))
 
@@ -58,7 +63,7 @@ class ModelTrainer:
         self.train_len = int(total_lenght * self.train_percent)
         self.val_len = int(total_lenght * self.val_percent) + self.train_len
 
-    def _initialize_scaler(self):
+    def _initialize_scaler(self) -> None:
         train_data = self.data.iloc[: self.train_len + self.window_size]
         self._scaler.fit(train_data[["close"]].values)
 
@@ -89,7 +94,7 @@ class ModelTrainer:
         self.test_y = self._y[self.val_len :]
         self.test_dates = self._dates[self.val_len :]
 
-    def _initialize_model(self):
+    def _initialize_model(self) -> None:
         model = Sequential(
             [
                 LSTM(
@@ -126,6 +131,18 @@ class ModelTrainer:
             validation_data=(self.val_X, self.val_y),
             epochs=self.epochs,
         )
+
+    def evaluate(self) -> Dict[str, float]:
+        y_pred_scaled = self._model.predict(self.test_X)
+        y_pred = self._scaler.inverse_transform(y_pred_scaled).flatten()
+        y_true = self._scaler.inverse_transform(self.test_y.reshape(-1, 1)).flatten()
+
+        return {
+            "mae": mean_absolute_error(y_true, y_pred),
+            "mse": mean_squared_error(y_true, y_pred),
+            "rmse": np.sqrt(mean_squared_error(y_true, y_pred)),
+            "mape": mean_absolute_percentage_error(y_true, y_pred),
+        }
 
     def save(self, path: Optional[Union[str, os.PathLike]] = None) -> None:
         path = get_absolute_path(path) if path is not None else self.model_path
