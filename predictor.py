@@ -3,7 +3,7 @@ import os
 from typing import Union
 
 import numpy as np
-from numpy.typing import ArrayLike
+import pandas as pd
 import pickle
 import tensorflow as tf
 
@@ -27,15 +27,23 @@ class Predictor:
         with open(self.path / "best_scaler.pkl", "rb") as f:
             self._scaler = pickle.load(f)
 
-    def _preprocess_data(self, data: ArrayLike) -> np.ndarray:
-        data = np.array(data).reshape(-1, 1)
-        data_scaled = self._scaler.transform(data)
+    def preprocess_data(self, data: pd.DataFrame) -> np.ndarray:
+        delta_time = data.index.to_series().diff().dt.total_seconds().fillna(0).values
+        close = data["close"].values
 
-        return data_scaled.reshape(-1, self.window_size, 1)
+        features = np.column_stack((close, delta_time))
+        features_scaled = self._scaler.transform(features)
 
-    def predict(self, data: ArrayLike) -> np.ndarray:
-        preprocessed_data = self._preprocess_data(data)
-        predict_data = self._model.predict(preprocessed_data)
-        response = self._scaler.inverse_transform(predict_data)
+        return features_scaled.reshape(-1, self.window_size, 2)
 
-        return response.flatten()
+    def predict(
+        self, data: Union[pd.DataFrame, np.ndarray], preprocessed: bool = False
+    ) -> np.ndarray:
+        if not preprocessed:
+            data = self.preprocess_data(data)
+        predict_data = self._model.predict(data)
+        response = self._scaler.inverse_transform(
+            np.hstack((predict_data, np.zeros_like(predict_data)))
+        )
+
+        return response[:, 0]

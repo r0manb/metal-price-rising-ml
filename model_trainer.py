@@ -27,7 +27,7 @@ class ModelTrainer:
         val_percent: float = 0.1,
         window_size: int = 7,
         model_path: Union[str, os.PathLike] = "models",
-    ) -> None:
+    ):
         self.data_parser = data_parser
         self._scaler = MinMaxScaler((0, 1))
 
@@ -57,27 +57,30 @@ class ModelTrainer:
 
     def _load_data(self) -> None:
         self.data = self.data_parser.fetch_data()
+        self.data["delta_time"] = (
+            self.data.index.to_series().diff().dt.total_seconds().fillna(0)
+        )
 
     def _calculate_splits(self) -> None:
         total_lenght = len(self.data) - self.window_size
         self.train_len = int(total_lenght * self.train_percent)
         self.val_len = int(total_lenght * self.val_percent) + self.train_len
 
-    def _initialize_scaler(self) -> None:
+    def _initialize_scaler(self):
         train_data = self.data.iloc[: self.train_len + self.window_size]
-        self._scaler.fit(train_data[["close"]].values)
+        self._scaler.fit(train_data.values)
 
     def _preprocess_data(self) -> None:
-        prices = self._scaler.transform(self.data[["close"]].values)
+        features = self._scaler.transform(self.data.values)
         dates = self.data.index.values
 
         X = []
         y = []
         for i in range(len(self.data) - self.window_size):
-            X.append(prices[i : i + self.window_size])
-            y.append(prices[i + self.window_size])
+            X.append(features[i : i + self.window_size])
+            y.append(features[i + self.window_size][0])
 
-        self._X = np.array(X).reshape(-1, self.window_size, 1).astype(np.float32)
+        self._X = np.array(X).astype(np.float32)  # .reshape(-1, self.window_size, 1)
         self._y = np.array(y).astype(np.float32)
         self._dates = dates[self.window_size :]
 
@@ -94,13 +97,13 @@ class ModelTrainer:
         self.test_y = self._y[self.val_len :]
         self.test_dates = self._dates[self.val_len :]
 
-    def _initialize_model(self) -> None:
+    def _initialize_model(self):
         model = Sequential(
             [
                 LSTM(
                     128,
                     return_sequences=True,
-                    input_shape=(self.window_size, 1),
+                    input_shape=(self.window_size, 2),
                     kernel_initializer="he_normal",
                 ),
                 Dropout(0.2),
@@ -114,6 +117,10 @@ class ModelTrainer:
 
         model.compile(optimizer="adam", loss="mse", metrics=["mean_absolute_error"])
         self._model = model
+
+    def _inverse_close(self, scaled_arr: np.ndarray) -> np.ndarray:
+        comb = np.hstack((scaled_arr, np.zeros_like(scaled_arr)))
+        return self._scaler.inverse_transform(comb)[:, 0]
 
     def _save_models(self, path: pathlib.Path) -> None:
         self._model.save(path / "best_model.keras")
@@ -134,8 +141,10 @@ class ModelTrainer:
 
     def evaluate(self) -> Dict[str, float]:
         y_pred_scaled = self._model.predict(self.test_X)
-        y_pred = self._scaler.inverse_transform(y_pred_scaled).flatten()
-        y_true = self._scaler.inverse_transform(self.test_y.reshape(-1, 1)).flatten()
+        y_pred = self._inverse_close(y_pred_scaled)
+
+        y_true_scaled = self.test_y.reshape(-1, 1)
+        y_true = self._inverse_close(y_true_scaled)
 
         return {
             "mae": mean_absolute_error(y_true, y_pred),
