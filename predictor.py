@@ -28,13 +28,18 @@ class Predictor:
             self._scaler = pickle.load(f)
 
     def preprocess_data(self, data: pd.DataFrame) -> np.ndarray:
+        if len(data) < self.window_size:
+            raise ValueError(
+                f"Not enough data for prediction: got {len(data)} rows, need {self.window_size}."
+            )
+
         delta_time = data.index.to_series().diff().dt.total_seconds().fillna(0).values
         close = data["close"].values
 
-        features = np.column_stack((close, delta_time))
+        features = np.column_stack((close, delta_time))[-self.window_size :]
         features_scaled = self._scaler.transform(features)
 
-        return features_scaled.reshape(-1, self.window_size, 2)
+        return features_scaled.reshape(1, self.window_size, 2)
 
     def predict(
         self, data: Union[pd.DataFrame, np.ndarray], preprocessed: bool = False
@@ -42,8 +47,8 @@ class Predictor:
         if not preprocessed:
             data = self.preprocess_data(data)
         predict_data = self._model.predict(data)
-        response = self._scaler.inverse_transform(
-            np.hstack((predict_data, np.zeros_like(predict_data)))
-        )
+
+        dummy = np.zeros_like(predict_data)
+        response = self._scaler.inverse_transform(np.hstack((predict_data, dummy)))
 
         return response[:, 0]
