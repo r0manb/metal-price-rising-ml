@@ -16,6 +16,7 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 
 from parsers.data_parser import DataParser
 from utils.path_utils import get_absolute_path
+from utils.datetime_utils import calculate_delta_time
 
 
 class ModelTrainer:
@@ -57,9 +58,7 @@ class ModelTrainer:
 
     def _load_data(self) -> None:
         self.data = self.data_parser.fetch_data()
-        self.data["delta_time"] = (
-            self.data.index.to_series().diff().dt.total_seconds().fillna(0)
-        )
+        self.data["delta_time"] = calculate_delta_time(self.data.index.values)
 
     def _calculate_splits(self) -> None:
         total_lenght = len(self.data) - self.window_size

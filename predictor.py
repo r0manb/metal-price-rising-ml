@@ -8,6 +8,7 @@ import pickle
 import tensorflow as tf
 
 from utils.path_utils import get_absolute_path
+from utils.datetime_utils import calculate_delta_time
 
 
 class Predictor:
@@ -33,7 +34,7 @@ class Predictor:
                 f"Not enough data for prediction: got {len(data)} rows, need {self.window_size}."
             )
 
-        delta_time = data.index.to_series().diff().dt.total_seconds().fillna(0).values
+        delta_time = calculate_delta_time(data.index.values)
         close = data["close"].values
 
         features = np.column_stack((close, delta_time))[-self.window_size :]
