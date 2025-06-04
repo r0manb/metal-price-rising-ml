@@ -67,10 +67,11 @@ class Predictor:
                 f"Not enough data for prediction: got {len(data)} rows, need {self.window_size}."
             )
 
+        data = data.iloc[-self.window_size :]
         delta_time = calculate_delta_time(data.index)
         close = data["close"].values
 
-        features = np.column_stack((close, delta_time))[-self.window_size :]
+        features = np.column_stack((close, delta_time))
         features_scaled = self._scaler.transform(features)
 
         return features_scaled.reshape(1, self.window_size, 2)
