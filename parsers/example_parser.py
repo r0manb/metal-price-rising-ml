@@ -21,8 +21,8 @@ class ExampleParser(DataParser):
         response = requests.get(
             "https://www.example.ru/api/trading/candles",
             {
-                "start": self.start.isoformat(),
-                "end": self.end.isoformat(),
+                "start": self._start.isoformat(),
+                "end": self._end.isoformat(),
                 "ticker": self.ticker,
                 "interval": self.interval,
             },
@@ -31,7 +31,7 @@ class ExampleParser(DataParser):
         procesed_data = self._normalize_data(data)
 
         self._data = procesed_data
-        return procesed_data
+        return self.get_data()
 
     def _normalize_data(self, data):
         df = pd.DataFrame(data)

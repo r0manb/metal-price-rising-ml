@@ -11,30 +11,43 @@ import tensorflow as tf
 from utils.path_utils import get_absolute_path
 from utils.datetime_utils import calculate_delta_time
 
+TimestampStrategy = Literal["last", "median", "adaptive"]
+
 
 class Predictor:
-    TIMESTAMP_STRATEGIES = Literal["last", "median", "adaptive"]
 
     def __init__(
         self,
         path: Union[str, os.PathLike] = "",
-        timestamp_strategy: TIMESTAMP_STRATEGIES = "adaptive",
+        timestamp_strategy: TimestampStrategy = "adaptive",
     ) -> None:
-        self.path = get_absolute_path(path)
+        self._path = get_absolute_path(path)
 
-        self.timestamp_strategies = {
+        self._timestamp_strategies = {
             "last": self._last_timestamp,
             "median": self._median_timestamp,
             "adaptive": self._adaptive_timestamp,
         }
         self._validate_strategy(timestamp_strategy)
-        self.timestamp_strategy = timestamp_strategy
+        self._timestamp_strategy = timestamp_strategy
 
         self._load_config()
         self._load_models()
 
-    def _validate_strategy(self, strategy: str) -> None:
-        if strategy not in self.timestamp_strategies:
+    @property
+    def timestamp_strategy(self) -> TimestampStrategy:
+        return self._timestamp_strategy
+
+    @property
+    def window_size(self) -> int:
+        return self._window_size
+
+    @property
+    def forecast_horizon(self) -> int:
+        return self._forecast_horizon
+
+    def _validate_strategy(self, strategy: TimestampStrategy) -> None:
+        if strategy not in self._timestamp_strategies:
             raise ValueError(f"Unknown timestamp strategy: {strategy}")
 
     def _last_timestamp(self, delta: ArrayLike) -> int:
@@ -51,45 +64,47 @@ class Predictor:
         return last_delta
 
     def _load_config(self) -> None:
-        with open(self.path / "config.json", encoding="utf-8") as f:
+        with open(self._path / "config.json", encoding="utf-8") as f:
             config = json.load(f)
-        self.window_size = config["window_size"]
-        self.forecast_horizon = config["forecast_horizon"]
+        self._window_size = config["window_size"]
+        self._forecast_horizon = config["forecast_horizon"]
 
     def _load_models(self) -> None:
-        self._model = tf.keras.models.load_model(self.path / "best_model.keras")
-        with open(self.path / "best_scaler.pkl", "rb") as f:
+        self._model = tf.keras.models.load_model(self._path / "best_model.keras")
+        with open(self._path / "best_scaler.pkl", "rb") as f:
             self._scaler = pickle.load(f)
 
     def preprocess_data(self, data: pd.DataFrame) -> np.ndarray:
-        if len(data) < self.window_size:
+        if len(data) < self._window_size:
             raise ValueError(
-                f"Not enough data for prediction: got {len(data)} rows, need {self.window_size}."
+                f"Not enough data for prediction: got {len(data)} rows, need {self._window_size}."
             )
 
-        data = data.iloc[-self.window_size :]
+        data = data.iloc[-self._window_size :]
         delta_time = calculate_delta_time(data.index)
         close = data["close"].values
 
         features = np.column_stack((close, delta_time))
         features_scaled = self._scaler.transform(features)
 
-        return features_scaled.reshape(1, self.window_size, 2)
+        return features_scaled.reshape(1, self._window_size, 2)
 
     def get_future_timestamps(
         self,
         dates: Union[np.ndarray, pd.DatetimeIndex],
-        timestamp_strategy: Optional[TIMESTAMP_STRATEGIES] = None,
+        timestamp_strategy: Optional[TimestampStrategy] = None,
     ) -> np.ndarray:
-        strategy = timestamp_strategy if timestamp_strategy else self.timestamp_strategy
+        strategy = (
+            timestamp_strategy if timestamp_strategy else self._timestamp_strategy
+        )
         self._validate_strategy(strategy)
 
         timestamps = dates.astype("datetime64[ns]")
         seconds = calculate_delta_time(timestamps)
-        delta = self.timestamp_strategies[strategy](seconds)
+        delta = self._timestamp_strategies[strategy](seconds)
 
         np_delta = np.timedelta64(delta, "s")
-        future_steps = np.arange(1, self.forecast_horizon + 1) * np_delta
+        future_steps = np.arange(1, self._forecast_horizon + 1) * np_delta
 
         return future_steps + timestamps[-1]
 
@@ -108,7 +123,7 @@ class Predictor:
     def predict_with_dates(
         self,
         data: pd.DataFrame,
-        timestamp_strategy: Optional[TIMESTAMP_STRATEGIES] = None,
+        timestamp_strategy: Optional[TimestampStrategy] = None,
         return_df: bool = False,
     ) -> Union[Tuple[np.ndarray, np.ndarray], pd.DataFrame]:
         predicted_data = self.predict(data)

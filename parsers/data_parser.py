@@ -18,6 +18,14 @@ class DataParser(ABC):
         self.ticker = ticker
         self.update_time_period(start, end)
 
+    @property
+    def start(self) -> dt.datetime:
+        return self._start
+
+    @property
+    def end(self) -> dt.datetime:
+        return self._end
+
     @abstractmethod
     def fetch_data(self) -> pd.DataFrame:
         pass
@@ -27,8 +35,8 @@ class DataParser(ABC):
         pass
 
     def get_data(self) -> Optional[pd.DataFrame]:
-        return self._data
+        return self._data.copy()
 
     def update_time_period(self, start: dt.datetime, end: dt.datetime) -> None:
-        self.start = start if start is not None else self.DEFAULT_START_DATE
-        self.end = end if end is not None else dt.datetime.now(dt.timezone.utc)
+        self._start = start if start is not None else self.DEFAULT_START_DATE
+        self._end = end if end is not None else dt.datetime.now(dt.timezone.utc)
